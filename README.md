@@ -1,6 +1,6 @@
 # Whaler haproxy plugin
 
-This plugin install haproxy as a load balancer for mcloud.
+This plugin install haproxy as a load balancer for whaler.
 Plugin is useful when you need deploy multiple applications on one server, or use complex application publishing.
 
 ## Install

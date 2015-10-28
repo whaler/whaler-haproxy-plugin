@@ -1,6 +1,6 @@
 {
   "name": "whaler-haproxy-plugin",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Whaler haproxy plugin",
   "author": "Sergei Vizel",
   "license": "MIT",
