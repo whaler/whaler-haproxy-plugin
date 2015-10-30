@@ -132,7 +132,7 @@ module.exports = function(whaler) {
                         'Binds': [
                             '/etc/whaler/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg'
                         ],
-                        PortBindings: {
+                        'PortBindings': {
                             '80/tcp': [
                                 {
                                     'HostIp': '',
@@ -145,6 +145,9 @@ module.exports = function(whaler) {
                                     'HostPort': '443'
                                 }
                             ]
+                        },
+                        'RestartPolicy': {
+                            'Name': 'always'
                         }
                     }
                 };
