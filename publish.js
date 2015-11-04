@@ -15,6 +15,7 @@ var addCmd = function(whaler) {
         };
 
         whaler.events.emit('haproxy-publish', opts, function(err) {
+            console.log('');
             if (err) {
                 return console.error('[%s] %s', process.pid, err.message, '\n');
             }
