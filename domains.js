@@ -63,7 +63,7 @@ module.exports = function(whaler, haproxyDb) {
                 }
             }
 
-            callback(null, [response]);
+            callback(null, response);
         });
     });
 };
