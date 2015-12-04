@@ -7,7 +7,10 @@ var addCmd = function(whaler) {
 
     whaler.cli.command(
         'domains [app]'
-    ).description(
+    ).argumentsHelp({
+        'app': 'Application name',
+        'domain': 'Domain to publish'
+    }).description(
         'Show domains'
     ).action(function(app, options) {
 
@@ -37,11 +40,6 @@ var addCmd = function(whaler) {
             console.log(table.toString(), '\n');
         });
 
-    }).on('--help', function() {
-        whaler.cli.argumentsHelp(this, {
-            'app': 'Application name',
-            'domain': 'Domain to publish'
-        });
     });
 };
 

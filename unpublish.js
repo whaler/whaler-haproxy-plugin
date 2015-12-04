@@ -5,7 +5,10 @@ var addCmd = function(whaler) {
 
     whaler.cli.command(
         'unpublish <domain> [app]'
-    ).description(
+    ).argumentsHelp({
+        'app': 'Application name',
+        'domain': 'Domain to unpublish'
+    }).description(
         'Unpublish an application'
     ).action(function(domain, app, options) {
 
@@ -24,11 +27,6 @@ var addCmd = function(whaler) {
             console.info('[%s] Domain "%s" unpublished from "%s" app.', process.pid, opts['domain'], app, '\n');
         });
 
-    }).on('--help', function() {
-        whaler.cli.argumentsHelp(this, {
-            'app': 'Application name',
-            'domain': 'Domain to unpublish'
-        });
     });
 };
 
