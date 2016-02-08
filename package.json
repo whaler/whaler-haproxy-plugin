@@ -1,6 +1,6 @@
 {
   "name": "whaler-haproxy-plugin",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "description": "Whaler haproxy plugin",
   "author": "Sergei Vizel",
   "license": "MIT",
@@ -10,6 +10,6 @@
     "cli-table": "^0.3.1",
     "nedb": "^1.5.0",
     "nunjucks": "^2.2.0",
-    "q": "^1.4.1"
+    "x-console": "^0.1.1"
   }
 }

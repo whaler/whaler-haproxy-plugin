@@ -1,212 +1,218 @@
 'use strict';
 
-var Q = require('q');
 var fs = require('fs');
 var nunjucks = require('nunjucks');
 var Datastore = require('nedb');
+var console = require('x-console');
 
-module.exports = function(whaler) {
-    nunjucks.configure(__dirname + '/templates');
+module.exports = exports;
+module.exports.__cmd = require('./cmd');
 
-    var console = whaler.require('./lib/console');
-
-    var haproxyDb = new Datastore({
-        filename: '/etc/whaler/haproxy.db',
+/**
+ * @param whaler
+ */
+function exports(whaler) {
+    const haproxyDb = new Datastore({
+        filename: '/var/lib/whaler/plugins/haproxy/db',
         autoload: true
     });
 
-    require('./domains')(whaler, haproxyDb);
-    require('./publish')(whaler, haproxyDb);
-    require('./unpublish')(whaler, haproxyDb);
-
-    var pull = Q.denodeify(whaler.docker.pull);
-    var createContainer = Q.denodeify(whaler.docker.createContainer);
-
-    var containerInspect = Q.denodeify(function(container, callback) {
-        container.inspect(callback);
-    });
-    var containerStart = Q.denodeify(function(container, callback) {
-        container.start(callback);
-    });
-    var containerRestart = Q.denodeify(function(container, callback) {
-        container.restart(callback);
-    });
-
-    var getApps = Q.denodeify(function(callback) {
-        whaler.apps.all(callback);
-    });
-    var getDomains = Q.denodeify(function(callback) {
-        haproxyDb.find({}, callback);
-    });
-
-    var createConfig = function(appName, ip, port, domains) {
-        var name = appName + '.whaler.lh_' + ip.replace('.', '_') + '_' + port;
-        return {
-            name: name,
-            domains: [
-                appName + '.whaler.lh'
-            ].concat(domains || []),
-            backends: [
-                {
-                    name: 'backend_' + name,
-                    port: port,
-                    ip: ip
-                }
-            ]
-        };
-    };
-
-    var touchHaproxy = function(callback) {
-        var promise = Q.async(function*() {
-            var apps = yield getApps();
-
-            var domains = {};
-            var docs = yield getDomains();
-            while (docs.length) {
-                var doc = docs.shift();
-                if (!domains[doc['app']]) {
-                    domains[doc['app']] = [];
-                }
-                domains[doc['app']].push(doc['_id']);
+    whaler.on('haproxy:domains', function* (options) {
+        const docs = yield haproxyDb.find.$call(haproxyDb, {});
+        const response = [];
+        for (let doc of docs) {
+            if (!options['app'] || options['app'] == doc.app) {
+                response.push([doc.app, doc._id]);
             }
+        }
+        return response;
+    });
 
-            var opts = {
-                apps: [],
-                ssl_apps: []
-            };
-
-            var keys = Object.keys(apps);
-            while (keys.length) {
-                var appName = keys.shift();
-                var app = apps[appName];
-                var names = Object.keys(app.config['data']);
-
-                while (names.length) {
-                    var name = names.shift();
-                    var config = app.config['data'][name];
-
-                    if (config['web'] || config['ssl']) {
-                        var container = whaler.docker.getContainer(name + '.' + appName);
-                        try {
-                            var info = yield containerInspect(container);
-                            if (info['State']['Running']) {
-                                var ip = info['NetworkSettings']['IPAddress'];
-                                if (config['web'] || null) {
-                                    opts['apps'].push(createConfig(appName, ip, config['web'], domains[appName] || []));
-                                }
-                                if (config['ssl'] || null) {
-                                    opts['ssl_apps'].push(createConfig(appName, ip, config['ssl'], domains[appName] || []));
-                                }
-                            }
-                        } catch (e) {}
-                    }
-                }
-            }
-
-            var res = nunjucks.render('haproxy.cfg', opts);
-            fs.writeFileSync('/etc/whaler/haproxy.cfg', res);
-
-            var created = false;
-            var started = false;
-
-            var container = whaler.docker.getContainer('whaler_haproxy');
-            try {
-                var info = yield containerInspect(container);
-                created = true;
-                if (info['State']['Running']) {
-                    started = true;
-                }
-            } catch (e) {}
-
-            if (!created) {
-                yield pull('haproxy:1.5');
-
-                var createOpts = {
-                    'name': 'whaler_haproxy',
-                    'Image': 'haproxy:1.5',
-                    'ExposedPorts': {
-                        '80/tcp': {},
-                        '443/tcp': {}
-                    },
-                    'HostConfig': {
-                        'Binds': [
-                            '/etc/whaler/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg'
-                        ],
-                        'PortBindings': {
-                            '80/tcp': [
-                                {
-                                    'HostIp': '',
-                                    'HostPort': '80'
-                                }
-                            ],
-                            '443/tcp': [
-                                {
-                                    'HostIp': '',
-                                    'HostPort': '443'
-                                }
-                            ]
-                        },
-                        'RestartPolicy': {
-                            'Name': 'always'
-                        }
-                    }
-                };
-
-                container = yield createContainer(createOpts);
-            }
-
-            if (started) {
-                yield containerRestart(container);
-                console.info('[%s] Haproxy restarted.', process.pid,'\n');
-
-            } else {
-                yield containerStart(container);
-                console.info('[%s] Haproxy started.', process.pid,'\n');
-            }
-
-        })();
-
-        promise.done(function() {
-            callback(null);
-        }, function(err) {
-            callback(err);
+    whaler.on('haproxy:domains:publish', function* (options) {
+        const storage = whaler.get('apps');
+        const app = yield storage.get.$call(storage, options['app']);
+        yield haproxyDb.insert.$call(haproxyDb, {
+            _id: options['domain'],
+            app: options['app']
         });
-    };
-
-    whaler.events.after('haproxy-publish', function(options, callback) {
-        touchHaproxy(callback);
     });
 
-    whaler.events.after('haproxy-unpublish', function(options, callback) {
-        touchHaproxy(callback);
+    whaler.on('haproxy:domains:unpublish', function* (options) {
+        const storage = whaler.get('apps');
+        const app = yield storage.get.$call(storage, options['app']);
+        const numRemoved = yield haproxyDb.remove.$call(haproxyDb, { _id: options['domain'] }, {});
     });
 
-    whaler.events.after('start', function(options, callback) {
-        touchHaproxy(callback);
+    whaler.after('haproxy:domains:publish', function* (options) {
+        yield touchHaproxy.$call(null, whaler, haproxyDb);
     });
 
-    whaler.events.after('stop', function(options, callback) {
-        touchHaproxy(callback);
+    whaler.after('haproxy:domains:unpublish', function* (options) {
+        yield touchHaproxy.$call(null, whaler, haproxyDb);
     });
 
-    whaler.events.after('remove', function(options, callback) {
-        options['ref'] = whaler.helpers.getRef(options['ref']);
+    whaler.after('start', function* (options) {
+        yield touchHaproxy.$call(null, whaler, haproxyDb);
+    });
 
-        var appName = options['ref'];
-        var containerName = null;
+    whaler.after('stop', function* (options) {
+        yield touchHaproxy.$call(null, whaler, haproxyDb);
+    });
 
-        var parts = options['ref'].split('.');
+    whaler.after('remove', function* (options) {
+        let appName = options['ref'];
+        let serviceName = null;
+
+        const parts = options['ref'].split('.');
         if (2 == parts.length) {
             appName = parts[1];
-            containerName = parts[0];
+            serviceName = parts[0];
         }
 
-        if (!containerName && options['purge']) {
-            haproxyDb.remove({ app: appName }, { multi: true }, function (err, numRemoved) {
-                touchHaproxy(callback);
-            });
-        } else {
-            touchHaproxy(callback);
+        if (!serviceName && options['purge']) {
+            const numRemoved = yield haproxyDb.remove.$call(haproxyDb, { app: appName }, { multi: true });
         }
+
+        yield touchHaproxy.$call(null, whaler, haproxyDb);
     });
-};
+}
+
+// PRIVATE
+
+/**
+ * @param appName
+ * @param ip
+ * @param port
+ * @param domains
+ * @returns {}
+ */
+function createConfig(appName, ip, port, domains) {
+    const name = appName + '.whaler.lh_' + ip + '_' + port;
+    return {
+        name: name,
+        domains: [
+            appName + '.whaler.lh'
+        ].concat(domains || []),
+        backends: [
+            {
+                name: 'backend_' + name,
+                port: port,
+                ip: ip
+            }
+        ]
+    };
+}
+
+/**
+ * @param whaler
+ * @param haproxyDb
+ */
+function* touchHaproxy(whaler, haproxyDb) {
+    const docker = whaler.get('docker');
+    const storage = whaler.get('apps');
+    const apps = yield storage.all.$call(storage);
+
+    const domains = {};
+    const docs = yield haproxyDb.find.$call(haproxyDb, {});
+    for (let doc of docs) {
+        if (!domains[doc['app']]) {
+            domains[doc['app']] = [];
+        }
+        domains[doc['app']].push(doc['_id']);
+    }
+
+    const opts = {
+        apps: [],
+        ssl_apps: []
+    };
+
+    for (let appName in apps) {
+        const app = apps[appName];
+        for (let name in app.config['data']) {
+            const config = app.config['data'][name];
+            if (config['web'] || config['ssl']) {
+                const container = docker.getContainer(name + '.' + appName);
+                try {
+                    const info = yield container.inspect.$call(container);
+                    if (info['State']['Running']) {
+                        const ip = info['NetworkSettings']['IPAddress'];
+                        if (config['web'] || null) {
+                            opts['apps'].push(createConfig(appName, ip, config['web'], domains[appName] || []));
+                        }
+                        if (config['ssl'] || null) {
+                            opts['ssl_apps'].push(createConfig(appName, ip, config['ssl'], domains[appName] || []));
+                        }
+                    }
+                } catch (e) {}
+            }
+        }
+    }
+
+    nunjucks.configure(__dirname + '/templates');
+    const res = nunjucks.render('haproxy.cfg', opts);
+    yield fs.writeFile.$call(null, '/var/lib/whaler/plugins/haproxy/cfg', res);
+
+    let created = false;
+    let started = false;
+
+    let container = docker.getContainer('whaler_haproxy');
+    try {
+        const info = yield container.inspect.$call(container);
+        created = true;
+        if (info['State']['Running']) {
+            started = true;
+        }
+    } catch (e) {}
+
+    if (!created) {
+        try {
+            yield docker.followPull.$call(docker, 'haproxy:1.5');
+        } catch(e) {}
+
+
+        const createOpts = {
+            'name': 'whaler_haproxy',
+            'Image': 'haproxy:1.5',
+            'ExposedPorts': {
+                '80/tcp': {},
+                '443/tcp': {}
+            },
+            'HostConfig': {
+                'Binds': [
+                    '/var/lib/whaler/plugins/haproxy/cfg:/usr/local/etc/haproxy/haproxy.cfg'
+                ],
+                'PortBindings': {
+                    '80/tcp': [
+                        {
+                            'HostIp': '',
+                            'HostPort': '80'
+                        }
+                    ],
+                    '443/tcp': [
+                        {
+                            'HostIp': '',
+                            'HostPort': '443'
+                        }
+                    ]
+                },
+                'RestartPolicy': {
+                    'Name': 'always'
+                }
+            }
+        };
+
+        container = yield docker.createContainer.$call(docker, createOpts);
+    }
+
+    if (started) {
+        yield container.restart.$call(container);
+        console.info('');
+        console.info('[%s] Haproxy restarted.', process.pid);
+
+    } else {
+        yield container.start.$call(container);
+        console.info('');
+        console.info('[%s] Haproxy started.', process.pid);
+    }
+}
+

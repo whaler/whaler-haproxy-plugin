@@ -6,7 +6,7 @@ Plugin is useful when you need deploy multiple applications on one server, or us
 ## Install
 
 ```sh
-$ whaler plugins install whaler-haproxy-plugin
+$ whaler plugins:install whaler-haproxy-plugin
 ```
 
 ## License
