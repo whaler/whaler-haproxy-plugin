@@ -86,13 +86,15 @@ function exports(whaler) {
  * @param domains
  * @returns {}
  */
-function createConfig(appName, ip, port, domains) {
+function createConfig(appName, ip, config, domains) {
+    const port = config['port'] || config;
     const name = appName + '.whaler.lh_' + ip + '_' + port;
     return {
         name: name,
         domains: [
             appName + '.whaler.lh'
         ].concat(domains || []),
+        send_proxy: (config['send-proxy'] || false),
         backends: [
             {
                 name: 'backend_' + name,

@@ -1,9 +1,19 @@
 {
   "name": "whaler-haproxy-plugin",
-  "version": "0.2.0",
   "description": "Whaler haproxy plugin",
-  "author": "Sergei Vizel",
+  "author": {
+    "name": "Sergei Vizel",
+    "email": "sergei.vizel@gmail.com",
+    "url": "https://github.com/cravler"
+  },
+  "homepage": "https://github.com/whaler/whaler-haproxy-plugin",
+  "keywords": [
+    "whaler",
+    "haproxy",
+    "plugin"
+  ],
   "license": "MIT",
+  "version": "0.2.1",
   "main": "index.js",
   "whaler-plugin": true,
   "dependencies": {
@@ -11,5 +21,15 @@
     "nedb": "^1.5.0",
     "nunjucks": "^2.2.0",
     "x-console": "^0.1.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:whaler/whaler-haproxy-plugin.git"
+  },
+  "bugs": {
+    "url": "https://github.com/whaler/whaler-haproxy-plugin/issues"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
   }
 }
