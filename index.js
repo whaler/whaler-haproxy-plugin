@@ -130,8 +130,14 @@ function* touchHaproxy(whaler, haproxyDb) {
 
     for (let appName in apps) {
         const app = apps[appName];
-        for (let name in app.config['data']) {
-            const config = app.config['data'][name];
+
+        let services = app.config['data'];
+        if (whaler.require('./package.json').version >= '0.3') {
+            services = app.config['data']['services'];
+        }
+
+        for (let name in services) {
+            const config = services[name];
             if (config['web'] || config['ssl']) {
                 const container = docker.getContainer(name + '.' + appName);
                 try {

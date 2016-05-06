@@ -13,13 +13,13 @@
     "plugin"
   ],
   "license": "MIT",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "main": "index.js",
   "whaler-plugin": true,
   "dependencies": {
     "cli-table": "^0.3.1",
-    "nedb": "^1.5.0",
-    "nunjucks": "^2.2.0",
+    "nedb": "^1.8.0",
+    "nunjucks": "^2.4.2",
     "x-console": "^0.1.1"
   },
   "repository": {
