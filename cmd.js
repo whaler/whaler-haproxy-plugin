@@ -16,6 +16,30 @@ function cmd(whaler) {
 
 }
 
+function printTable(whaler, head, data) {
+    try {
+        const table = whaler.get('cli-table')({
+            head: head
+        });
+
+        console.log('');
+        console.log(table.render(data));
+    } catch(e) {
+        const table = new Table({
+            head: head,
+            style : {
+                head: [ 'cyan' ]
+            }
+        });
+        for (let row of data) {
+            table.push(row);
+        }
+
+        console.log('');
+        console.log(table.toString());
+    }
+}
+
 /**
  * @param whaler
  */
@@ -31,21 +55,7 @@ function domains(whaler) {
                 app: app
             });
 
-            const table = new Table({
-                head: [
-                    'Application name',
-                    'Domain'
-                ],
-                style : {
-                    head: [ 'cyan' ]
-                }
-            });
-            for (let data of response) {
-                table.push(data);
-            }
-
-            console.log('');
-            console.log(table.toString());
+            printTable(whaler, [ 'Container name', 'Status', 'IP' ], response);
         });
 
 }
