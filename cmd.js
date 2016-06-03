@@ -55,7 +55,7 @@ function domains(whaler) {
                 app: app
             });
 
-            printTable(whaler, [ 'Container name', 'Status', 'IP' ], response);
+            printTable(whaler, [ 'Application name', 'Domain' ], response);
         });
 
 }
