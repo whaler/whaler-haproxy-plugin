@@ -30,6 +30,30 @@ address=/whaler.lh/127.0.0.1
 
 > **NB!** Don't forget to replace 127.0.0.1 with virtual machine ip, if not on linux.
 
+## Usage
+
+```yml
+services:
+    service-name:
+        web: 80
+        ssl: 443
+        ...
+
+# OR
+
+services:
+    service-name:
+        web:
+            port: 80
+            defaults: |
+                timeout connect 5s
+                timeout client 50s
+                timeout server 50s
+        ssl:
+            port: 443
+            send-proxy: true
+        ...
+```
 
 ## License
 

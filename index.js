@@ -89,11 +89,18 @@ function exports(whaler) {
 function createConfig(appName, ip, config, domains) {
     const port = config['port'] || config;
     const name = appName + '.whaler.lh_' + ip + '_' + port;
+
+    let defaults = config['defaults'] || null;
+    if (defaults) {
+        defaults = defaults.replace(/(?:\r\n|\r|\n)/g, '\n        ').trim();
+    }
+
     return {
         name: name,
         domains: [
             appName + '.whaler.lh'
         ].concat(domains || []),
+        defaults: defaults,
         send_proxy: (config['send-proxy'] || false),
         backends: [
             {
