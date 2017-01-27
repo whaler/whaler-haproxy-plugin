@@ -1,6 +1,7 @@
 'use strict';
 
 var fs = require('fs');
+var util = require('util');
 var nunjucks = require('nunjucks');
 var Datastore = require('nedb');
 var console = require('x-console');
@@ -12,12 +13,8 @@ module.exports.__cmd = require('./cmd');
  * @param whaler
  */
 function exports(whaler) {
-    const haproxyDb = new Datastore({
-        filename: '/var/lib/whaler/plugins/haproxy/db',
-        autoload: true
-    });
-
     whaler.on('haproxy:domains', function* (options) {
+        const haproxyDb = yield loadDb.$call(null);
         const docs = yield haproxyDb.find.$call(haproxyDb, {});
         const response = [];
         for (let doc of docs) {
@@ -31,6 +28,7 @@ function exports(whaler) {
     whaler.on('haproxy:domains:publish', function* (options) {
         const storage = whaler.get('apps');
         const app = yield storage.get.$call(storage, options['app']);
+        const haproxyDb = yield loadDb.$call(null);
         yield haproxyDb.insert.$call(haproxyDb, {
             _id: options['domain'],
             app: options['app']
@@ -38,24 +36,33 @@ function exports(whaler) {
     });
 
     whaler.on('haproxy:domains:unpublish', function* (options) {
-        const storage = whaler.get('apps');
-        const app = yield storage.get.$call(storage, options['app']);
+        const haproxyDb = yield loadDb.$call(null);
+        const docs = yield haproxyDb.find.$call(haproxyDb, { _id: options['domain'] });
+        const data = docs[0] || null;
+        if (!data || options['domain'] !== data['_id']) {
+            throw new Error(util.format('Domain "%s" not found.', options['domain']));
+        }
         const numRemoved = yield haproxyDb.remove.$call(haproxyDb, { _id: options['domain'] }, {});
+        return data['app'];
     });
 
     whaler.after('haproxy:domains:publish', function* (options) {
+        const haproxyDb = yield loadDb.$call(null);
         yield touchHaproxy.$call(null, whaler, haproxyDb);
     });
 
     whaler.after('haproxy:domains:unpublish', function* (options) {
+        const haproxyDb = yield loadDb.$call(null);
         yield touchHaproxy.$call(null, whaler, haproxyDb);
     });
 
     whaler.after('start', function* (options) {
+        const haproxyDb = yield loadDb.$call(null);
         yield touchHaproxy.$call(null, whaler, haproxyDb);
     });
 
     whaler.after('stop', function* (options) {
+        const haproxyDb = yield loadDb.$call(null);
         yield touchHaproxy.$call(null, whaler, haproxyDb);
     });
 
@@ -69,6 +76,8 @@ function exports(whaler) {
             serviceName = parts[0];
         }
 
+        const haproxyDb = yield loadDb.$call(null);
+
         if (!serviceName && options['purge']) {
             const numRemoved = yield haproxyDb.remove.$call(haproxyDb, { app: appName }, { multi: true });
         }
@@ -78,6 +87,18 @@ function exports(whaler) {
 }
 
 // PRIVATE
+
+/**
+ * @param callback
+ */
+function loadDb(callback) {
+    const db = new Datastore({
+        filename: '/var/lib/whaler/plugins/haproxy/db'
+    });
+    db.loadDatabase((err) => {
+        callback(err, db);
+    });
+}
 
 /**
  * @param appName

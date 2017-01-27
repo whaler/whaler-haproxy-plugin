@@ -91,16 +91,13 @@ function publish(whaler) {
 function unpublish(whaler) {
 
     whaler.get('cli')
-        .command('domains:unpublish <domain> [app]')
+        .command('domains:unpublish <domain>')
         //.alias('unpublish')
         .description('Unpublish app domain', {
-            app: 'Application name',
             domain: 'Domain to unpublish'
         })
-        .action(function* (domain, app, options) {
-            app = this.util.prepare('name', app);
-            yield whaler.$emit('haproxy:domains:unpublish', {
-                app: app,
+        .action(function* (domain, options) {
+            const app = yield whaler.$emit('haproxy:domains:unpublish', {
                 domain: domain
             });
 
