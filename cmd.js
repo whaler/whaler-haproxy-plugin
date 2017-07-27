@@ -50,12 +50,18 @@ function domains(whaler) {
         .description('Show published domains', {
             app: 'Application name'
         })
+        .option('-f, --format <FORMAT>', 'The output format (txt or json) [default: "txt"]')
         .action(function* (app, options) {
             const response = yield whaler.$emit('haproxy:domains', {
                 app: app
             });
 
-            printTable(whaler, [ 'Application name', 'Domain' ], response);
+            if ('json' == options.format) {
+                this.ignoreEndLine(true);
+                console.log(JSON.stringify(response, null, 2));
+            } else {
+                printTable(whaler, [ 'Application name', 'Domain' ], response);
+            }
         });
 
 }

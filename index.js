@@ -107,9 +107,11 @@ function loadDb(callback) {
  * @param domains
  * @returns {}
  */
-function createConfig(appName, ip, config, domains) {
-    const port = config['port'] || config;
-    const name = appName + '.whaler.lh_' + ip + '_' + port;
+function createConfig(appName, ip, config, domains, type) {
+    const domain = process.env.WHALER_HAPROXY_PLUGIN_DOMAIN || 'whaler.lh';
+
+    const port = config['port'] || ('object' == typeof config ? null : config);
+    const name = appName + '.' + domain + '_' + ip + '_' + (port || type);
 
     let defaults = config['defaults'] || null;
     if (defaults) {
@@ -119,7 +121,7 @@ function createConfig(appName, ip, config, domains) {
     return {
         name: name,
         domains: [
-            appName + '.whaler.lh'
+            appName + '.' + domain
         ].concat(domains || []),
         defaults: defaults,
         send_proxy: (config['send-proxy'] || false),
@@ -173,10 +175,10 @@ function* touchHaproxy(whaler, haproxyDb) {
                     if (info['State']['Running']) {
                         const ip = info['NetworkSettings']['IPAddress'];
                         if (config['web'] || null) {
-                            opts['apps'].push(createConfig(appName, ip, config['web'], domains[appName] || []));
+                            opts['apps'].push(createConfig(appName, ip, config['web'], domains[appName] || [], 'web'));
                         }
                         if (config['ssl'] || null) {
-                            opts['ssl_apps'].push(createConfig(appName, ip, config['ssl'], domains[appName] || []));
+                            opts['ssl_apps'].push(createConfig(appName, ip, config['ssl'], domains[appName] || [], 'ssl'));
                         }
                     }
                 } catch (e) {}
