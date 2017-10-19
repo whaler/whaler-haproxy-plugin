@@ -89,6 +89,14 @@ function exports(whaler) {
 // PRIVATE
 
 /**
+ * @param delay
+ * @param callback
+ */
+function sleep (delay, callback) {
+    setTimeout(() => callback(null), delay);
+}
+
+/**
  * @param callback
  */
 function loadDb(callback) {
@@ -96,7 +104,13 @@ function loadDb(callback) {
         filename: '/var/lib/whaler/plugins/haproxy/db'
     });
     db.loadDatabase((err) => {
-        callback(err, db);
+        if (err) {
+            sleep(100, () => {
+                loadDb(callback);
+            });
+        } else {
+            callback(null, db);
+        }
     });
 }
 
@@ -123,15 +137,13 @@ function createConfig(appName, ip, config, domains, type) {
         domains: [
             appName + '.' + domain
         ].concat(domains || []),
-        defaults: defaults,
         send_proxy: (config['send-proxy'] || false),
-        backends: [
-            {
-                name: 'backend_' + name,
-                port: port,
-                ip: ip
-            }
-        ]
+        backend: {
+            defaults: defaults,
+            name: 'backend_' + name,
+            port: port,
+            ip: ip
+        }
     };
 }
 
@@ -155,7 +167,14 @@ function* touchHaproxy(whaler, haproxyDb) {
 
     const opts = {
         apps: [],
-        ssl_apps: []
+        ssl_apps: [],
+        defaults: {
+            timeout: {
+                connect: process.env.WHALER_HAPROXY_PLUGIN_DEFAULTS_TIMEOUT_CONNECT || '5s',
+                client: process.env.WHALER_HAPROXY_PLUGIN_DEFAULTS_TIMEOUT_CLIENT || '50s',
+                server: process.env.WHALER_HAPROXY_PLUGIN_DEFAULTS_TIMEOUT_SERVER || '50s'
+            }
+        }
     };
 
     for (let appName in apps) {

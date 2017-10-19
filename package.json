@@ -13,7 +13,7 @@
     "plugin"
   ],
   "license": "MIT",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "main": "index.js",
   "whaler-plugin": true,
   "dependencies": {

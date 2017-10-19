@@ -46,8 +46,6 @@ services:
         web:
             port: 80
             defaults: |
-                timeout connect 5s
-                timeout client 50s
                 timeout server 50s
         ssl:
             port: 443
