@@ -165,6 +165,8 @@ function* touchHaproxy(whaler, haproxyDb) {
         domains[doc['app']].push(doc['_id']);
     }
 
+    const useDNS = 'OFF' != process.env.WHALER_HAPROXY_PLUGIN_DNS;
+
     const opts = {
         apps: [],
         ssl_apps: [],
@@ -175,7 +177,7 @@ function* touchHaproxy(whaler, haproxyDb) {
                 server: process.env.WHALER_HAPROXY_PLUGIN_DEFAULTS_TIMEOUT_SERVER || '50s'
             }
         },
-        dns: 'OFF' != process.env.WHALER_HAPROXY_PLUGIN_DNS && {
+        dns: useDNS && {
             tcp: {
                 addr: process.env.WHALER_HAPROXY_PLUGIN_DNS_TCP_ADDR || '127.0.0.11',
                 port: process.env.WHALER_HAPROXY_PLUGIN_DNS_TCP_PORT || '53'
@@ -184,7 +186,7 @@ function* touchHaproxy(whaler, haproxyDb) {
     };
 
     let whalerNetwork;
-    if ('OFF' != process.env.WHALER_HAPROXY_PLUGIN_DNS) {
+    if (useDNS) {
         whalerNetwork = docker.getNetwork('whaler_nw');
         try {
             yield whalerNetwork.inspect.$call(whalerNetwork);
