@@ -174,8 +174,24 @@ function* touchHaproxy(whaler, haproxyDb) {
                 client: process.env.WHALER_HAPROXY_PLUGIN_DEFAULTS_TIMEOUT_CLIENT || '50s',
                 server: process.env.WHALER_HAPROXY_PLUGIN_DEFAULTS_TIMEOUT_SERVER || '50s'
             }
+        },
+        dns: 'OFF' != process.env.WHALER_HAPROXY_PLUGIN_DNS && {
+            tcp: {
+                addr: process.env.WHALER_HAPROXY_PLUGIN_DNS_TCP_ADDR || '127.0.0.11',
+                port: process.env.WHALER_HAPROXY_PLUGIN_DNS_TCP_PORT || '53'
+            }
         }
     };
+
+    let whalerNetwork;
+    if ('OFF' != process.env.WHALER_HAPROXY_PLUGIN_DNS) {
+        whalerNetwork = docker.getNetwork('whaler_nw');
+        try {
+            yield whalerNetwork.inspect.$call(whalerNetwork);
+        } catch (e) {
+            whalerNetwork = undefined;
+        }
+    }
 
     for (let appName in apps) {
         const app = apps[appName];
@@ -188,26 +204,30 @@ function* touchHaproxy(whaler, haproxyDb) {
         for (let name in services) {
             const config = services[name];
             if (config['web'] || config['ssl']) {
-                const container = docker.getContainer(name + '.' + appName);
-                try {
-                    const info = yield container.inspect.$call(container);
-                    if (info['State']['Running']) {
-                        const ip = info['NetworkSettings']['IPAddress'];
-                        if (config['web'] || null) {
-                            opts['apps'].push(createConfig(appName, ip, config['web'], domains[appName] || [], 'web'));
+                let ip;
+                if (whalerNetwork) {
+                    ip = name + '.' + appName;
+                } else {
+                    const container = docker.getContainer(name + '.' + appName);
+                    try {
+                        const info = yield container.inspect.$call(container);
+                        if (info['State']['Running']) {
+                            ip = info['NetworkSettings']['IPAddress'];
                         }
-                        if (config['ssl'] || null) {
-                            opts['ssl_apps'].push(createConfig(appName, ip, config['ssl'], domains[appName] || [], 'ssl'));
-                        }
+                    } catch (e) {}
+                }
+
+                if (ip) {
+                    if (config['web'] || null) {
+                        opts['apps'].push(createConfig(appName, ip, config['web'], domains[appName] || [], 'web'));
                     }
-                } catch (e) {}
+                    if (config['ssl'] || null) {
+                        opts['ssl_apps'].push(createConfig(appName, ip, config['ssl'], domains[appName] || [], 'ssl'));
+                    }
+                }
             }
         }
     }
-
-    nunjucks.configure(__dirname + '/templates');
-    const res = nunjucks.render('haproxy.cfg', opts);
-    yield fs.writeFile.$call(null, '/var/lib/whaler/plugins/haproxy/cfg', res);
 
     let created = false;
     let started = false;
@@ -221,22 +241,37 @@ function* touchHaproxy(whaler, haproxyDb) {
         }
     } catch (e) {}
 
-    if (!created) {
-        try {
-            yield docker.followPull.$call(docker, 'haproxy:1.5');
-        } catch(e) {}
+    nunjucks.configure(__dirname + '/templates');
+    const res = nunjucks.render('haproxy.cfg', opts);
+    const cfgFile = '/var/lib/whaler/plugins/haproxy/cfg';
 
+    if (created && started) {
+        try {
+            const prevRes = yield fs.readFile.$call(null, cfgFile, 'utf8');
+            if (prevRes == res) {
+                return;
+            }
+        } catch (e) {}
+    }
+
+    yield fs.writeFile.$call(null, cfgFile, res);
+
+    if (!created) {
+        const haproxyVersion = '1.7';
+        try {
+            yield docker.followPull.$call(docker, 'haproxy:' + haproxyVersion);
+        } catch(e) {}
 
         const createOpts = {
             'name': 'whaler_haproxy',
-            'Image': 'haproxy:1.5',
+            'Image': 'haproxy:' + haproxyVersion,
             'ExposedPorts': {
                 '80/tcp': {},
                 '443/tcp': {}
             },
             'HostConfig': {
                 'Binds': [
-                    '/var/lib/whaler/plugins/haproxy/cfg:/usr/local/etc/haproxy/haproxy.cfg'
+                    cfgFile + ':/usr/local/etc/haproxy/haproxy.cfg'
                 ],
                 'PortBindings': {
                     '80/tcp': [
@@ -259,6 +294,14 @@ function* touchHaproxy(whaler, haproxyDb) {
         };
 
         container = yield docker.createContainer.$call(docker, createOpts);
+    }
+
+    if (whalerNetwork) {
+        try {
+            yield whalerNetwork.connect.$call(whalerNetwork, {
+                'Container': container.id
+            });
+        } catch(e) {}
     }
 
     if (started) {
