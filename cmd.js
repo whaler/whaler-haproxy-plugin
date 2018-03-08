@@ -1,92 +1,62 @@
 'use strict';
 
-var console = require('x-console');
-var Table = require('cli-table');
-
 module.exports = cmd;
 
 /**
  * @param whaler
  */
-function cmd(whaler) {
+async function cmd (whaler) {
 
-    domains(whaler);
-    publish(whaler);
-    unpublish(whaler);
+    await domains(whaler);
+    await publish(whaler);
+    await unpublish(whaler);
 
-}
-
-function printTable(whaler, head, data) {
-    try {
-        const table = whaler.get('cli-table')({
-            head: head
-        });
-
-        console.log('');
-        console.log(table.render(data));
-    } catch(e) {
-        const table = new Table({
-            head: head,
-            style : {
-                head: [ 'cyan' ]
-            }
-        });
-        for (let row of data) {
-            table.push(row);
-        }
-
-        console.log('');
-        console.log(table.toString());
-    }
 }
 
 /**
  * @param whaler
  */
-function domains(whaler) {
+async function domains (whaler) {
 
-    whaler.get('cli')
+    (await whaler.fetch('cli')).default
+
         .command('domains [app]')
         .description('Show published domains', {
             app: 'Application name'
         })
         .option('-f, --format <FORMAT>', 'The output format (txt or json) [default: "txt"]')
-        .action(function* (app, options) {
-            const response = yield whaler.$emit('haproxy:domains', {
-                app: app
-            });
+        .action(async (app, options) => {
+            const response = await whaler.emit('haproxy:domains', { app });
 
             if ('json' == options.format) {
-                this.ignoreEndLine(true);
                 console.log(JSON.stringify(response, null, 2));
             } else {
-                printTable(whaler, [ 'Application name', 'Domain' ], response);
+                const table = (await whaler.fetch('cli-table')).default({
+                    head: [ 'Application name', 'Domain' ]
+                });
+                console.log('\n' + table.render(response) + '\n');
             }
-        });
-
+        })
+        .ignoreEndLine(true);
 }
 
 /**
  * @param whaler
  */
-function publish(whaler) {
+async function publish (whaler) {
 
-    whaler.get('cli')
+    (await whaler.fetch('cli')).default
+
         .command('domains:publish <domain> [app]')
         //.alias('publish')
         .description('Publish app domain', {
             app: 'Application name',
             domain: 'Domain to publish'
         })
-        .action(function* (domain, app, options) {
-            app = this.util.prepare('name', app);
-            yield whaler.$emit('haproxy:domains:publish', {
-                app: app,
-                domain: domain
-            });
-
-            console.info('');
-            console.info('[%s] Domain "%s" published to "%s" app.', process.pid, domain, app);
+        .action(async (domain, app, options, util) => {
+            app = util.prepare('name', app);
+            await whaler.emit('haproxy:domains:publish', { app, domain });
+            whaler.info('Domain "%s" published to "%s" app.', domain, app);
         });
 
 }
@@ -94,21 +64,18 @@ function publish(whaler) {
 /**
  * @param whaler
  */
-function unpublish(whaler) {
+async function unpublish (whaler) {
 
-    whaler.get('cli')
+    (await whaler.fetch('cli')).default
+
         .command('domains:unpublish <domain>')
         //.alias('unpublish')
         .description('Unpublish app domain', {
             domain: 'Domain to unpublish'
         })
-        .action(function* (domain, options) {
-            const app = yield whaler.$emit('haproxy:domains:unpublish', {
-                domain: domain
-            });
-
-            console.info('');
-            console.info('[%s] Domain "%s" unpublished from "%s" app.', process.pid, domain, app);
+        .action(async (domain, options) => {
+            const app = await whaler.emit('haproxy:domains:unpublish', { domain });
+            whaler.info('Domain "%s" unpublished from "%s" app.', domain, app);
         });
 
 }
