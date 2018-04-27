@@ -27,7 +27,7 @@ async function exports (whaler) {
         const response = [];
         for (let domain in data) {
             if (!ctx.options['app'] || ctx.options['app'] == data[domain]['app']) {
-                response.push([data[domain]['app'], domain]);
+                response.push([data[domain]['app'], domain, data[domain]['regex'] || false]);
             }
         }
         ctx.result = response;
@@ -37,7 +37,8 @@ async function exports (whaler) {
         const { default: storage } = await whaler.fetch('apps');
         const app = await storage.get(ctx.options['app']);
         await haproxyDb.insert(ctx.options['domain'], {
-            app: ctx.options['app']
+            app: ctx.options['app'],
+            regex: ctx.options['regex'] || false
         });
     });
 
@@ -97,7 +98,10 @@ async function exports (whaler) {
             if (!domains[data[domain]['app']]) {
                 domains[data[domain]['app']] = [];
             }
-            domains[data[domain]['app']].push(domain);
+            domains[data[domain]['app']].push({
+                name: domain,
+                regex: data[domain]['regex'] || false
+            });
         }
 
         const useDNS = 'OFF' != process.env.WHALER_HAPROXY_PLUGIN_DNS;
@@ -264,7 +268,10 @@ function createConfig (appName, ip, config, domains, type) {
     return {
         name: name,
         domains: [
-            appName + '.' + domain
+            {
+                name: appName + '.' + domain,
+                regex: false
+            }
         ].concat(domains || []),
         send_proxy: (config['send-proxy'] || false),
         backend: {

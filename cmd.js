@@ -32,7 +32,7 @@ async function domains (whaler) {
                 console.log(JSON.stringify(response, null, 2));
             } else {
                 const table = (await whaler.fetch('cli-table')).default({
-                    head: [ 'Application name', 'Domain' ]
+                    head: [ 'Application name', 'Domain', 'Regex' ]
                 });
                 console.log('\n' + table.render(response) + '\n');
             }
@@ -53,9 +53,10 @@ async function publish (whaler) {
             app: 'Application name',
             domain: 'Domain to publish'
         })
+        .option('--regex', 'Match domain as regex')
         .action(async (domain, app, options, util) => {
             app = util.prepare('name', app);
-            await whaler.emit('haproxy:domains:publish', { app, domain });
+            await whaler.emit('haproxy:domains:publish', { app, domain, regex: options.regex });
             whaler.info('Domain "%s" published to "%s" app.', domain, app);
         });
 
