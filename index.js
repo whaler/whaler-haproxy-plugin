@@ -169,12 +169,21 @@ async function exports (whaler) {
         let created = false;
         let started = false;
 
+        const haproxyVersion = process.env.WHALER_HAPROXY_PLUGIN_IMAGE_TAG || '1.8';
+
         let container = docker.getContainer('whaler_haproxy');
         try {
             const info = await container.inspect();
             created = true;
             if (info['State']['Running']) {
                 started = true;
+            }
+
+            if (created && 'haproxy:' + haproxyVersion !== info['Config']['Image']) {
+                await container.remove({
+                    v: true,
+                    force: true
+                });
             }
         } catch (e) {}
 
@@ -194,7 +203,6 @@ async function exports (whaler) {
         await fsWriteFile(cfgFile, res);
 
         if (!created) {
-            const haproxyVersion = '1.7';
             try {
                 await docker.followPull('haproxy:' + haproxyVersion);
             } catch(e) {}
