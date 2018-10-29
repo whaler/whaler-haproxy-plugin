@@ -242,7 +242,8 @@ async function exports (whaler) {
         }
 
         if (started) {
-            await container.restart();
+            //await container.restart();
+            await container.kill({ signal: 'HUP' });
             whaler.info('Haproxy restarted.');
 
         } else {
