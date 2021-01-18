@@ -37,7 +37,7 @@ async function domains (whaler) {
                 console.log('\n' + table.render(response) + '\n');
             }
         })
-        .ignoreEndLine(true);
+        .ignoreOutEndLine(true);
 }
 
 /**
@@ -57,7 +57,7 @@ async function publish (whaler) {
         .action(async (domain, app, options, util) => {
             app = util.prepare('name', app);
             await whaler.emit('haproxy:domains:publish', { app, domain, regex: options.regex });
-            whaler.info('Domain "%s" published to "%s" app.', domain, app);
+            whaler.info('Domain `%s` published to `%s` app.', domain, app);
         });
 
 }
@@ -76,7 +76,7 @@ async function unpublish (whaler) {
         })
         .action(async (domain, options) => {
             const app = await whaler.emit('haproxy:domains:unpublish', { domain });
-            whaler.info('Domain "%s" unpublished from "%s" app.', domain, app);
+            whaler.info('Domain `%s` unpublished from `%s` app.', domain, app);
         });
 
 }

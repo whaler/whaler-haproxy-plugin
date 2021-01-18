@@ -13,11 +13,15 @@
     "plugin"
   ],
   "license": "MIT",
-  "version": "0.3.2",
+  "version": "0.4.0-dev",
   "main": "index.js",
   "whaler-plugin": true,
   "dependencies": {
     "nunjucks": "^3.2.2"
+  },
+  "engines": {
+    "node": ">=14.15",
+    "whaler": ">=0.7"
   },
   "repository": {
     "type": "git",

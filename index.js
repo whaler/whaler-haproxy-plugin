@@ -1,11 +1,7 @@
 'use strict';
 
-const fs = require('fs');
-const util = require('util');
+const fs = require('fs').promises;
 const nunjucks = require('nunjucks');
-
-const fsReadFile = util.promisify(fs.readFile);
-const fsWriteFile = util.promisify(fs.writeFile);
 
 module.exports = exports;
 module.exports.__cmd = require('./cmd');
@@ -14,16 +10,16 @@ module.exports.__cmd = require('./cmd');
  * @param whaler
  */
 async function exports (whaler) {
+    if (!whaler.version) {
+        throw new Error('unsupported version of `whaler` installed, require `whaler@>=0.7`');
+    }
 
-    const { default: Storage } = await whaler.import('./lib/storage');
-    const { default: promisify } = await whaler.import('./lib/promisify');
-
-    const haproxyDb = promisify(
-        new Storage('db', '/var/lib/whaler/plugins/haproxy')
-    );
+    const { default: storage } = await whaler.fetch('storage');
+    const createHaproxyStorage = () => storage.create('haproxy');
 
     whaler.on('haproxy:domains', async ctx => {
-        const data = await haproxyDb.all();
+        const haproxyStorage = createHaproxyStorage();
+        const data = await haproxyStorage.all();
         const response = [];
         for (let domain in data) {
             if (!ctx.options['app'] || ctx.options['app'] == data[domain]['app']) {
@@ -36,7 +32,8 @@ async function exports (whaler) {
     whaler.on('haproxy:domains:publish', async ctx => {
         const { default: storage } = await whaler.fetch('apps');
         const app = await storage.get(ctx.options['app']);
-        await haproxyDb.insert(ctx.options['domain'], {
+        const haproxyStorage = createHaproxyStorage();
+        await haproxyStorage.insert(ctx.options['domain'], {
             app: ctx.options['app'],
             regex: ctx.options['regex'] || false
         });
@@ -44,11 +41,12 @@ async function exports (whaler) {
 
     whaler.on('haproxy:domains:unpublish', async ctx => {
         try {
-            const data = await haproxyDb.get(ctx.options['domain']);
-            const numRemoved = await haproxyDb.remove(ctx.options['domain']);
+            const haproxyStorage = createHaproxyStorage();
+            const data = await haproxyStorage.get(ctx.options['domain']);
+            await haproxyStorage.remove(ctx.options['domain']);
             ctx.result = data['app'];
         } catch (e) {
-            throw new Error(util.format('Domain "%s" not found.', ctx.options['domain']));
+            throw new Error(util.format('Domain `%s` not found.', ctx.options['domain']));
         }
     });
 
@@ -79,7 +77,13 @@ async function exports (whaler) {
         }
 
         if (!serviceName && ctx.options['purge']) {
-            const numRemoved = await haproxyDb.remove({ app: appName });
+            const haproxyStorage = createHaproxyStorage();
+            const data = await haproxyStorage.all();
+            for (let domain in data) {
+                if (appName == data[domain]['app']) {
+                    await haproxyStorage.remove(domain);
+                }
+            }
         }
 
         await touchHaproxy();
@@ -93,7 +97,8 @@ async function exports (whaler) {
         const apps = await storage.all();
 
         const domains = {};
-        const data = await haproxyDb.all();
+        const haproxyStorage = createHaproxyStorage();
+        const data = await haproxyStorage.all();
         for (let domain in data) {
             if (!domains[data[domain]['app']]) {
                 domains[data[domain]['app']] = [];
@@ -169,7 +174,7 @@ async function exports (whaler) {
         let created = false;
         let started = false;
 
-        const haproxyVersion = process.env.WHALER_HAPROXY_PLUGIN_IMAGE_TAG || '1.8';
+        const haproxyVersion = process.env.WHALER_HAPROXY_PLUGIN_IMAGE_TAG || '2.2';
 
         let container = docker.getContainer('whaler_haproxy');
         try {
@@ -189,18 +194,20 @@ async function exports (whaler) {
 
         nunjucks.configure(__dirname + '/templates');
         const res = nunjucks.render('haproxy.cfg', opts);
-        const cfgFile = '/var/lib/whaler/plugins/haproxy/cfg';
+        const pluginDir = '/var/lib/whaler/plugins/haproxy';
+        const cfgFile = pluginDir + '/cfg';
 
         if (created && started) {
             try {
-                const prevRes = await fsReadFile(cfgFile, 'utf8');
+                const prevRes = await fs.readFile(cfgFile, 'utf8');
                 if (prevRes == res) {
                     return;
                 }
             } catch (e) {}
         }
 
-        await fsWriteFile(cfgFile, res);
+        await fs.mkdir(pluginDir, { recursive: true });
+        await fs.writeFile(cfgFile, res);
 
         if (!created) {
             try {
