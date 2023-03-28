@@ -229,13 +229,13 @@ async function exports (whaler) {
                         '80/tcp': [
                             {
                                 'HostIp': '',
-                                'HostPort': '80'
+                                'HostPort': process.env.WHALER_HAPROXY_PLUGIN_WEB_PORT || '80'
                             }
                         ],
                         '443/tcp': [
                             {
                                 'HostIp': '',
-                                'HostPort': '443'
+                                'HostPort': process.env.WHALER_HAPROXY_PLUGIN_SSL_PORT || '443'
                             }
                         ]
                     },
