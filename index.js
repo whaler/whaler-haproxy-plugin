@@ -192,7 +192,7 @@ async function exports (whaler) {
             }
         } catch (e) {}
 
-        nunjucks.configure(__dirname + '/templates');
+        nunjucks.configure(__dirname + '/templates', { autoescape: false });
         const res = nunjucks.render('haproxy.cfg', opts);
         const pluginDir = '/var/lib/whaler/plugins/haproxy';
         const cfgFile = pluginDir + '/cfg';
