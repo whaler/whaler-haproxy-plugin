@@ -126,6 +126,10 @@ async function exports (whaler) {
                     addr: process.env.WHALER_HAPROXY_PLUGIN_DNS_TCP_ADDR || '127.0.0.11',
                     port: process.env.WHALER_HAPROXY_PLUGIN_DNS_TCP_PORT || '53'
                 }
+            },
+            fallback: {
+                web: process.env.WHALER_HAPROXY_PLUGIN_FALLBACK_WEB || null,
+                ssl: process.env.WHALER_HAPROXY_PLUGIN_FALLBACK_SSL || null
             }
         };
 
